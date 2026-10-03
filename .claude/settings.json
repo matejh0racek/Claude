@@ -9,6 +9,7 @@
   },
   "enabledPlugins": {
     "taste-skill@matej-skills": true,
-    "impeccable@matej-skills": true
+    "impeccable@matej-skills": true,
+    "playwright-cli@matej-skills": true
   }
 }

@@ -28,6 +28,13 @@
         "path": "plugin"
       },
       "homepage": "https://impeccable.style"
+    },
+    {
+      "name": "playwright-cli",
+      "description": "Browser automation with Microsoft's playwright-cli: drive a real browser, take snapshots and screenshots, trace, mock requests and generate Playwright tests. Needs `npm install -g @playwright/cli`.",
+      "category": "development",
+      "source": "./plugins/playwright-cli",
+      "homepage": "https://github.com/microsoft/playwright-cli"
     }
   ]
 }

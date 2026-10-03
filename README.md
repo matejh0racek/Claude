@@ -6,8 +6,9 @@ Matej's Claude skills, packaged as a Claude Code plugin marketplace (`matej-skil
 | --- | --- | --- |
 | `taste-skill` | 13 frontend design skills: `design-taste-frontend` (main), minimalist, brutalist, high-end visual design, redesign, image-to-code, brandkit, image-gen, and more | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) |
 | `impeccable` | `/impeccable` (audit, critique, polish, …), 4 helper agents, and design-detector hooks | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) |
+| `playwright-cli` | Browser automation: open pages, click, fill, snapshot, screenshot, trace, mock requests, and generate Playwright tests. Needs the CLI: `npm install -g @playwright/cli` | [microsoft/playwright-cli](https://github.com/microsoft/playwright-cli) |
 
-Both plugins are pulled straight from their authors' repos, so `claude plugin marketplace update` gets their latest versions. Nothing is copied into this repo.
+`taste-skill` and `impeccable` are pulled straight from their authors' repos, so `claude plugin marketplace update` gets their latest versions. Playwright doesn't publish a Claude Code plugin, so its skill lives in `plugins/playwright-cli/`. Refresh it with `scripts/update-playwright-cli.sh`.
 
 ## Use the skills everywhere
 
@@ -17,6 +18,8 @@ Both plugins are pulled straight from their authors' repos, so `claude plugin ma
 claude plugin marketplace add matejh0racek/Claude
 claude plugin install taste-skill@matej-skills
 claude plugin install impeccable@matej-skills
+claude plugin install playwright-cli@matej-skills
+npm install -g @playwright/cli   # the browser tool the playwright-cli skill drives
 ```
 
 You can also run `/plugin` inside Claude Code and pick them from the menu. To update later, run `claude plugin marketplace update matej-skills`.
@@ -28,7 +31,16 @@ Cloud sessions start from a fresh container, so add the same commands to your en
 ```sh
 claude plugin marketplace add matejh0racek/Claude \
   && claude plugin install taste-skill@matej-skills \
-  && claude plugin install impeccable@matej-skills
+  && claude plugin install impeccable@matej-skills \
+  && claude plugin install playwright-cli@matej-skills \
+  && npm install -g @playwright/cli
+```
+
+`playwright-cli` opens Google Chrome by default, which cloud containers don't have. To use their preinstalled Chromium instead, add these under **Environment variables** in the same Edit screen:
+
+```
+PLAYWRIGHT_MCP_BROWSER=chromium
+PLAYWRIGHT_MCP_EXECUTABLE_PATH=/opt/pw-browsers/chromium
 ```
 
 If the setup script ever can't reach this repo, install from the upstream marketplaces directly:
