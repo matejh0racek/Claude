@@ -7,8 +7,9 @@ Matej's Claude skills, packaged as a Claude Code plugin marketplace (`matej-skil
 | `taste-skill` | 13 frontend design skills: `design-taste-frontend` (main), minimalist, brutalist, high-end visual design, redesign, image-to-code, brandkit, image-gen, and more | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) |
 | `impeccable` | `/impeccable` (audit, critique, polish, …), 4 helper agents, and design-detector hooks | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) |
 | `playwright-cli` | Browser automation: open pages, click, fill, snapshot, screenshot, trace, mock requests, and generate Playwright tests. Needs the CLI: `npm install -g @playwright/cli` | [microsoft/playwright-cli](https://github.com/microsoft/playwright-cli) |
+| `design-md` | 74 ready-made DESIGN.md design systems (Stripe, Linear, Vercel, Apple, Notion, …). Say "make it look like Linear" and Claude drops the matching DESIGN.md into your project and builds from it | [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md) |
 
-`taste-skill` and `impeccable` are pulled straight from their authors' repos, so `claude plugin marketplace update` gets their latest versions. Playwright doesn't publish a Claude Code plugin, so its skill lives in `plugins/playwright-cli/`. Refresh it with `scripts/update-playwright-cli.sh`.
+`taste-skill` and `impeccable` are pulled straight from their authors' repos, so `claude plugin marketplace update` gets their latest versions. Playwright and awesome-design-md don't publish Claude Code plugins, so they're packaged here in `plugins/playwright-cli/` and `plugins/design-md/`. Refresh them with `scripts/update-playwright-cli.sh` and `scripts/update-design-md.sh`.
 
 ## Use the skills everywhere
 
@@ -19,6 +20,7 @@ claude plugin marketplace add matejh0racek/Claude
 claude plugin install taste-skill@matej-skills
 claude plugin install impeccable@matej-skills
 claude plugin install playwright-cli@matej-skills
+claude plugin install design-md@matej-skills
 npm install -g @playwright/cli   # the browser tool the playwright-cli skill drives
 ```
 
@@ -33,6 +35,7 @@ claude plugin marketplace add matejh0racek/Claude \
   && claude plugin install taste-skill@matej-skills \
   && claude plugin install impeccable@matej-skills \
   && claude plugin install playwright-cli@matej-skills \
+  && claude plugin install design-md@matej-skills \
   && npm install -g @playwright/cli
 ```
 
