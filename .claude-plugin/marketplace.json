@@ -1,0 +1,33 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "matej-skills",
+  "owner": {
+    "name": "Matej Horacek"
+  },
+  "metadata": {
+    "description": "Matej's Claude Code skills: one place to install them in any project or session."
+  },
+  "plugins": [
+    {
+      "name": "taste-skill",
+      "description": "Frontend design taste skills (design-taste-frontend, minimalist, brutalist, high-end visual design, redesign, image-to-code, brandkit, and more) by Leonxlnx.",
+      "category": "design",
+      "source": {
+        "source": "github",
+        "repo": "Leonxlnx/taste-skill"
+      },
+      "homepage": "https://github.com/Leonxlnx/taste-skill"
+    },
+    {
+      "name": "impeccable",
+      "description": "Design fluency for frontend work: /impeccable audit, critique, polish and more, with agents and an anti-pattern detector hook. By Paul Bakaus.",
+      "category": "design",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/pbakaus/impeccable.git",
+        "path": "plugin"
+      },
+      "homepage": "https://impeccable.style"
+    }
+  ]
+}
