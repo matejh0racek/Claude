@@ -16,27 +16,17 @@ Matej's Claude skills, packaged as a Claude Code plugin marketplace (`matej-skil
 ### Claude Code on your computer: once, for all projects
 
 ```sh
-claude plugin marketplace add matejh0racek/Claude
-claude plugin install taste-skill@matej-skills
-claude plugin install impeccable@matej-skills
-claude plugin install playwright-cli@matej-skills
-claude plugin install design-md@matej-skills
-npm install -g @playwright/cli   # the browser tool the playwright-cli skill drives
+curl -fsSL https://raw.githubusercontent.com/matejh0racek/Claude/main/scripts/setup.sh | sh
 ```
 
-You can also run `/plugin` inside Claude Code and pick them from the menu. To update later, run `claude plugin marketplace update matej-skills`.
+[`scripts/setup.sh`](scripts/setup.sh) adds this marketplace, installs every plugin in it, and installs the `playwright-cli` command. Run the same line again any time to update everything, including plugins added to the marketplace later. Restart Claude Code afterwards.
 
 ### Claude Code cloud sessions (claude.ai/code), for any repo
 
-Cloud sessions start from a fresh container, so add the same commands to your environment's **setup script**. You'll find it in the environment menu in the session title bar, under **Edit → Setup script**:
+Cloud sessions start from a fresh container. Paste the same line into your environment's **setup script**, which you'll find in the environment menu in the session title bar, under **Edit → Setup script**:
 
 ```sh
-claude plugin marketplace add matejh0racek/Claude \
-  && claude plugin install taste-skill@matej-skills \
-  && claude plugin install impeccable@matej-skills \
-  && claude plugin install playwright-cli@matej-skills \
-  && claude plugin install design-md@matej-skills \
-  && npm install -g @playwright/cli
+curl -fsSL https://raw.githubusercontent.com/matejh0racek/Claude/main/scripts/setup.sh | sh
 ```
 
 `playwright-cli` opens Google Chrome by default, which cloud containers don't have. To use their preinstalled Chromium instead, add these under **Environment variables** in the same Edit screen:
