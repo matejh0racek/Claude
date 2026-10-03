@@ -8,8 +8,9 @@ Matej's Claude skills, packaged as a Claude Code plugin marketplace (`matej-skil
 | `impeccable` | `/impeccable` (audit, critique, polish, …), 4 helper agents, and design-detector hooks | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) |
 | `playwright-cli` | Browser automation: open pages, click, fill, snapshot, screenshot, trace, mock requests, and generate Playwright tests. Needs the CLI: `npm install -g @playwright/cli` | [microsoft/playwright-cli](https://github.com/microsoft/playwright-cli) |
 | `design-md` | 74 ready-made DESIGN.md design systems (Stripe, Linear, Vercel, Apple, Notion, …). Say "make it look like Linear" and Claude drops the matching DESIGN.md into your project and builds from it | [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md) |
+| `img2threejs` | Turns a reference image of an object or character into a procedural, animation-ready Three.js model built in code, with staged quality gates. Needs Python 3.10+ | [hoainho/img2threejs](https://github.com/hoainho/img2threejs) |
 
-`taste-skill` and `impeccable` are pulled straight from their authors' repos, so `claude plugin marketplace update` gets their latest versions. Playwright and awesome-design-md don't publish Claude Code plugins, so they're packaged here in `plugins/playwright-cli/` and `plugins/design-md/`. Refresh them with `scripts/update-playwright-cli.sh` and `scripts/update-design-md.sh`.
+`taste-skill` and `impeccable` are pulled straight from their authors' repos, so `claude plugin marketplace update` gets their latest versions. Playwright, awesome-design-md and img2threejs don't publish Claude Code plugins, so they're packaged here under `plugins/`. Refresh each one with its `scripts/update-*.sh` script.
 
 ## Use the skills everywhere
 
