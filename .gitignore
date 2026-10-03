@@ -1,0 +1,4 @@
+# Impeccable engine binary (platform-specific; launcher downloads a checksum-verified copy on demand)
+.claude/skills/impeccable/scripts/bin/
+# Machine-local Claude Code settings
+.claude/settings.local.json
