@@ -1,0 +1,11 @@
+{
+  "name": "design-md",
+  "description": "70+ ready-made DESIGN.md design systems modeled on real products (Stripe, Linear, Vercel, Apple, Notion, ...), installable into any project on request.",
+  "version": "1.0.0",
+  "author": {
+    "name": "VoltAgent (packaged by Matej Horacek)"
+  },
+  "homepage": "https://github.com/VoltAgent/awesome-design-md",
+  "repository": "https://github.com/VoltAgent/awesome-design-md",
+  "license": "MIT"
+}

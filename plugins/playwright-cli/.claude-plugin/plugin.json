@@ -1,0 +1,11 @@
+{
+  "name": "playwright-cli",
+  "description": "Browser automation with Microsoft's playwright-cli: open pages, click, fill, snapshot, screenshot, trace, mock requests and generate Playwright tests.",
+  "version": "0.1.22",
+  "author": {
+    "name": "Microsoft (packaged by Matej Horacek)"
+  },
+  "homepage": "https://github.com/microsoft/playwright-cli",
+  "repository": "https://github.com/microsoft/playwright-cli",
+  "license": "Apache-2.0"
+}

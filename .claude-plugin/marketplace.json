@@ -28,6 +28,20 @@
         "path": "plugin"
       },
       "homepage": "https://impeccable.style"
+    },
+    {
+      "name": "playwright-cli",
+      "description": "Browser automation with Microsoft's playwright-cli: drive a real browser, take snapshots and screenshots, trace, mock requests and generate Playwright tests. Needs `npm install -g @playwright/cli`.",
+      "category": "development",
+      "source": "./plugins/playwright-cli",
+      "homepage": "https://github.com/microsoft/playwright-cli"
+    },
+    {
+      "name": "design-md",
+      "description": "74 ready-made DESIGN.md design systems modeled on real products (Stripe, Linear, Vercel, Apple, Notion, ...). Say \"make it look like Linear\" and Claude installs the matching DESIGN.md and builds from it. From VoltAgent/awesome-design-md.",
+      "category": "design",
+      "source": "./plugins/design-md",
+      "homepage": "https://github.com/VoltAgent/awesome-design-md"
     }
   ]
 }
