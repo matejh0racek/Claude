@@ -42,6 +42,13 @@
       "category": "design",
       "source": "./plugins/design-md",
       "homepage": "https://github.com/VoltAgent/awesome-design-md"
+    },
+    {
+      "name": "img2threejs",
+      "description": "Turn a reference image of an object or character into a quality-gated, animation-ready procedural Three.js model built in code. Needs Python 3.10+. From hoainho/img2threejs.",
+      "category": "development",
+      "source": "./plugins/img2threejs",
+      "homepage": "https://github.com/hoainho/img2threejs"
     }
   ]
 }

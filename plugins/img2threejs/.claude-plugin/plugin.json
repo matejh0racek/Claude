@@ -1,0 +1,11 @@
+{
+  "name": "img2threejs",
+  "description": "Turn a reference image of an object or character into a quality-gated, animation-ready procedural Three.js model built in code.",
+  "version": "2.0.0",
+  "author": {
+    "name": "hoainho (packaged by Matej Horacek)"
+  },
+  "homepage": "https://github.com/hoainho/img2threejs",
+  "repository": "https://github.com/hoainho/img2threejs",
+  "license": "Apache-2.0"
+}
