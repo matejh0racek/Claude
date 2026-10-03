@@ -31,7 +31,7 @@ claude plugin marketplace add matejh0racek/Claude \
   && claude plugin install impeccable@matej-skills
 ```
 
-This repo is private. If the setup script can't read it, either make the repo public (it holds no secrets, only references to public plugins) or install from the upstream marketplaces directly:
+If the setup script ever can't reach this repo, install from the upstream marketplaces directly:
 
 ```sh
 claude plugin marketplace add Leonxlnx/taste-skill && claude plugin install taste-skill@taste-skill
