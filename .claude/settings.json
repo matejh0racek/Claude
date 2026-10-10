@@ -1,17 +1,4 @@
 {
-  "extraKnownMarketplaces": {
-    "matej-skills": {
-      "source": {
-        "source": "github",
-        "repo": "matejh0racek/Claude"
-      }
-    }
-  },
-  "enabledPlugins": {
-    "taste-skill@matej-skills": true,
-    "impeccable@matej-skills": true,
-    "playwright-cli@matej-skills": true,
-    "design-md@matej-skills": true,
-    "img2threejs@matej-skills": true
-  }
+  "enabledPlugins": {},
+  "extraKnownMarketplaces": {}
 }

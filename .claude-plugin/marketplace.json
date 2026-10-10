@@ -13,8 +13,8 @@
       "description": "Frontend design taste skills (design-taste-frontend, minimalist, brutalist, high-end visual design, redesign, image-to-code, brandkit, and more) by Leonxlnx.",
       "category": "design",
       "source": {
-        "source": "github",
-        "repo": "Leonxlnx/taste-skill"
+        "source": "url",
+        "url": "https://github.com/Leonxlnx/taste-skill.git"
       },
       "homepage": "https://github.com/Leonxlnx/taste-skill"
     },

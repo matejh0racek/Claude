@@ -17,7 +17,7 @@ fi
 if claude plugin marketplace list 2>/dev/null | grep -q "$marketplace"; then
   claude plugin marketplace update "$marketplace"
 else
-  claude plugin marketplace add "$repo"
+  claude plugin marketplace add "https://github.com/$repo.git"
 fi
 
 # Read plugin names from the marketplace manifest.
