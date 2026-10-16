@@ -187,7 +187,7 @@ final class GTINavigationViewController: NavigationViewController {
         configureCamera(navigationMapView)
 
         // Styles can reload (for example day/night), so add the buildings every time one loads.
-        let map = navigationMapView.mapView.mapboxMap
+        guard let map = navigationMapView.mapView.mapboxMap else { return }
         map.onStyleLoaded.observe { [weak map] _ in
             if let map { add3DBuildings(to: map) }
         }.store(in: &styleObservers)
