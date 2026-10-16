@@ -28,7 +28,7 @@ let gtiAlternateGrey = UIColor(red: 90/255, green: 90/255, blue: 98/255, alpha: 
 
 // Car model on the map. Make carScale bigger or smaller if the car looks wrong,
 // and change carRotation (in degrees: 90, 180, 270) if it drives sideways or backwards.
-let carScale: Double = 1.5
+let carScale: Double = 2.4
 let carRotation: Double = 0
 
 // MARK: - Map styles (same dark style day and night, like the GTI cluster)
@@ -205,8 +205,8 @@ final class GTINavigationViewController: NavigationViewController {
         following.pitchNearManeuver.enabled = false
         following.geometryFramingAfterManeuver.enabled = false
         // Zoom still follows the road ahead: closer through junctions and short streets, further out on
-        // long straights, but never so far that it looks like a map (SDK default: 10.5...16.35).
-        following.zoomRange = 14.0...17.6
+        // long straights, but always close enough to feel like driving (SDK default: 10.5...16.35).
+        following.zoomRange = 15.6...18.2
         dataSource.options.followingCameraOptions = following
     }
 
@@ -235,6 +235,140 @@ final class GTINavigationViewController: NavigationViewController {
         for button in navigationView.allSubviews(ofType: ResumeButton.self) {
             button.addGTIGlass(.capsule)
         }
+    }
+}
+
+// MARK: - Bottom bar
+
+// Replaces the SDK's bottom bar: three even columns with the arrival time large in the middle.
+//   [ 11 min ]   [ 20:37 ]   [ 5,2 km ]   ✕
+//     time       ARRIVAL      distance
+final class GTIBottomBanner: UIViewController, NavigationComponent {
+    var onCancel: (() -> Void)?
+
+    private let card = UIView()
+    private let timeValue = UILabel()
+    private let arrivalValue = UILabel()
+    private let distanceValue = UILabel()
+
+    private let durationFormatter: DateComponentsFormatter = {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.hour, .minute]
+        formatter.unitsStyle = .short
+        return formatter
+    }()
+
+    private let arrivalFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        formatter.dateStyle = .none
+        return formatter
+    }()
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+
+        card.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(card)
+        card.addGTIGlass(.rounded(28, GTIGlassView.allCorners))
+
+        let timeColumn = column(value: timeValue, caption: "time", size: 20)
+        let arrivalColumn = column(value: arrivalValue, caption: "ARRIVAL", size: 34, emphasised: true)
+        let distanceColumn = column(value: distanceValue, caption: "distance", size: 20)
+
+        let columns = UIStackView(arrangedSubviews: [timeColumn, arrivalColumn, distanceColumn])
+        columns.axis = .horizontal
+        columns.distribution = .fillEqually
+        columns.alignment = .center
+        columns.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(columns)
+
+        let divider = UIView()
+        divider.backgroundColor = UIColor.white.withAlphaComponent(0.15)
+        divider.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(divider)
+
+        let cancelButton = UIButton(type: .system)
+        cancelButton.setImage(UIImage(systemName: "xmark", withConfiguration:
+            UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)), for: .normal)
+        cancelButton.tintColor = .white
+        cancelButton.accessibilityLabel = "End navigation"
+        cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
+        cancelButton.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(cancelButton)
+
+        NSLayoutConstraint.activate([
+            card.topAnchor.constraint(equalTo: view.topAnchor),
+            card.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+            card.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+            card.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -4),
+            card.heightAnchor.constraint(equalToConstant: 84),
+
+            cancelButton.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+            cancelButton.topAnchor.constraint(equalTo: card.topAnchor),
+            cancelButton.bottomAnchor.constraint(equalTo: card.bottomAnchor),
+            cancelButton.widthAnchor.constraint(equalToConstant: 64),
+
+            divider.trailingAnchor.constraint(equalTo: cancelButton.leadingAnchor),
+            divider.widthAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
+            divider.topAnchor.constraint(equalTo: card.topAnchor, constant: 18),
+            divider.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18),
+
+            columns.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 8),
+            columns.trailingAnchor.constraint(equalTo: divider.leadingAnchor, constant: -4),
+            columns.centerYAnchor.constraint(equalTo: card.centerYAnchor),
+        ])
+
+        timeValue.text = "–"
+        arrivalValue.text = "–"
+        distanceValue.text = "–"
+    }
+
+    private func column(value: UILabel, caption: String, size: CGFloat, emphasised: Bool = false) -> UIStackView {
+        value.font = emphasised
+            ? .monospacedDigitSystemFont(ofSize: size, weight: .bold)
+            : .monospacedDigitSystemFont(ofSize: size, weight: .semibold)
+        value.textColor = .white
+        value.textAlignment = .center
+        value.adjustsFontSizeToFitWidth = true
+        value.minimumScaleFactor = 0.6
+
+        let captionLabel = UILabel()
+        captionLabel.text = caption
+        captionLabel.font = .systemFont(ofSize: 11, weight: emphasised ? .bold : .medium)
+        captionLabel.textColor = emphasised ? gtiRed : UIColor.white.withAlphaComponent(0.55)
+        captionLabel.textAlignment = .center
+
+        let stack = UIStackView(arrangedSubviews: [value, captionLabel])
+        stack.axis = .vertical
+        stack.alignment = .center
+        stack.spacing = emphasised ? 0 : 2
+        return stack
+    }
+
+    @objc private func cancelTapped() {
+        onCancel?()
+    }
+
+    // Called by the SDK on every location update.
+    func onRouteProgressUpdated(_ progress: RouteProgress) {
+        let remaining = progress.durationRemaining
+        timeValue.text = remaining < 60 ? "<1 min" : durationFormatter.string(from: remaining)
+        arrivalValue.text = arrivalFormatter.string(from: Date().addingTimeInterval(remaining))
+        distanceValue.text = formattedDistance(progress.distanceRemaining)
+    }
+
+    private func formattedDistance(_ meters: CLLocationDistance) -> String {
+        let formatter = MeasurementFormatter()
+        formatter.unitOptions = .providedUnit
+        formatter.numberFormatter.maximumFractionDigits = meters < 10_000 ? 1 : 0
+        if meters < 1000 {
+            formatter.numberFormatter.maximumFractionDigits = 0
+            let rounded = (meters / 50).rounded() * 50
+            return formatter.string(from: Measurement(value: rounded, unit: UnitLength.meters))
+        }
+        return formatter.string(from: Measurement(value: meters / 1000, unit: UnitLength.kilometers))
     }
 }
 
@@ -305,17 +439,23 @@ final class ViewController: UIViewController {
         case .failure(let error):
             print("Route request failed: \(error.localizedDescription)")
         case .success(let navigationRoutes):
+            let bottomBanner = GTIBottomBanner()
             let navigationOptions = NavigationOptions(
                 mapboxNavigation: mapboxNavigation,
                 voiceController: navigationProvider.routeVoiceController,
                 eventsManager: navigationProvider.eventsManager(),
-                styles: [GTIDayStyle(), GTINightStyle()]
+                styles: [GTIDayStyle(), GTINightStyle()],
+                bottomBanner: bottomBanner
             )
             let navigationViewController = GTINavigationViewController(
                 navigationRoutes: navigationRoutes,
                 navigationOptions: navigationOptions
             )
             navigationViewController.delegate = self
+            bottomBanner.onCancel = { [weak navigationViewController] in
+                guard let navigationViewController else { return }
+                navigationViewController.didTapCancel(navigationViewController)
+            }
             navigationViewController.modalPresentationStyle = .fullScreen
 
             // After each progress update the SDK repaints the main route with a traffic
