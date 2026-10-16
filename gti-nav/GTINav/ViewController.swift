@@ -198,16 +198,15 @@ final class GTINavigationViewController: NavigationViewController {
         guard let dataSource = navigationMapView.navigationCamera.viewportDataSource as? MobileViewportDataSource
         else { return }
         var following = dataSource.options.followingCameraOptions
-        // Zoom out further on open roads and further in at junctions (SDK default: 10.5...16.35).
-        following.zoomRange = 12.0...17.8
-        // Look further ahead, like a driver's view (SDK default: 45°).
-        following.defaultPitch = 60
-        // Start flattening the view and framing the turn earlier before a manoeuvre.
-        following.pitchNearManeuver.triggerDistanceToManeuver = 250
-        // Fit more of the road after the turn into view.
-        following.geometryFramingAfterManeuver.distanceToFrameAfterManeuver = 150
-        // React to closely spaced junctions sooner, so the camera zooms in through busy areas.
-        following.intersectionDensity.averageDistanceMultiplier = 5
+        // Driver's-eye view like Waze: always tilted, never flattening to top-down (SDK default: 45°).
+        following.defaultPitch = 62
+        // The SDK normally flattens the camera to top-down before each turn and zooms out to show the
+        // road after it. Turn both off so the perspective stays steady through turns.
+        following.pitchNearManeuver.enabled = false
+        following.geometryFramingAfterManeuver.enabled = false
+        // Zoom still follows the road ahead: closer through junctions and short streets, further out on
+        // long straights, but never so far that it looks like a map (SDK default: 10.5...16.35).
+        following.zoomRange = 14.0...17.6
         dataSource.options.followingCameraOptions = following
     }
 
