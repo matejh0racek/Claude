@@ -88,6 +88,15 @@ private func applyGTIAppearance() {
             ResumeButton.appearance(for: traits).borderColor = .clear
             ResumeButton.appearance(for: traits).borderWidth = 0
 
+            // "11 min" is coloured by traffic (green/orange/red) by default; keep it white like the rest.
+            let timeLabel = TimeRemainingLabel.appearance(for: traits)
+            timeLabel.normalTextColor = .white
+            timeLabel.trafficUnknownColor = .white
+            timeLabel.trafficLowColor = .white
+            timeLabel.trafficModerateColor = .white
+            timeLabel.trafficHeavyColor = .white
+            timeLabel.trafficSevereColor = .white
+
             SeparatorView.appearance(for: traits).backgroundColor = UIColor.white.withAlphaComponent(0.12)
             // The bottom card is inset from the screen edges, so its full-width divider would stick out.
             SeparatorView.appearance(for: traits, whenContainedInInstancesOf: [BottomBannerView.self])
@@ -166,8 +175,42 @@ extension UIView {
     }
 }
 
-// Same as the SDK's NavigationViewController, with glass behind the banners and buttons.
+// Same as the SDK's NavigationViewController, with glass behind the banners and buttons,
+// 3D buildings and a camera that zooms and tilts more with the road ahead.
 final class GTINavigationViewController: NavigationViewController {
+    private var styleObservers = Set<AnyCancelable>()
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        guard let navigationMapView else { return }
+
+        configureCamera(navigationMapView)
+
+        // Styles can reload (for example day/night), so add the buildings every time one loads.
+        let map = navigationMapView.mapView.mapboxMap
+        map.onStyleLoaded.observe { [weak map] _ in
+            if let map { add3DBuildings(to: map) }
+        }.store(in: &styleObservers)
+        if map.isStyleLoaded { add3DBuildings(to: map) }
+    }
+
+    private func configureCamera(_ navigationMapView: NavigationMapView) {
+        guard let dataSource = navigationMapView.navigationCamera.viewportDataSource as? MobileViewportDataSource
+        else { return }
+        var following = dataSource.options.followingCameraOptions
+        // Zoom out further on open roads and further in at junctions (SDK default: 10.5...16.35).
+        following.zoomRange = 12.0...17.8
+        // Look further ahead, like a driver's view (SDK default: 45°).
+        following.defaultPitch = 60
+        // Start flattening the view and framing the turn earlier before a manoeuvre.
+        following.pitchNearManeuver.triggerDistanceToManeuver = 250
+        // Fit more of the road after the turn into view.
+        following.geometryFramingAfterManeuver.distanceToFrameAfterManeuver = 150
+        // React to closely spaced junctions sooner, so the camera zooms in through busy areas.
+        following.intersectionDensity.averageDistanceMultiplier = 5
+        dataSource.options.followingCameraOptions = following
+    }
+
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
 
@@ -194,6 +237,31 @@ final class GTINavigationViewController: NavigationViewController {
             button.addGTIGlass(.capsule)
         }
     }
+}
+
+// MARK: - 3D buildings
+
+// Dark grey extruded buildings from Mapbox Streets, drawn above the roads and below the
+// route line and labels so the red route always stays visible.
+@MainActor
+private func add3DBuildings(to map: MapboxMap) {
+    let layerID = "gti-3d-buildings"
+    guard map.sourceExists(withId: "composite"), !map.layerExists(withId: layerID) else { return }
+
+    var layer = FillExtrusionLayer(id: layerID, source: "composite")
+    layer.sourceLayer = "building"
+    layer.minZoom = 14
+    layer.filter = Exp(.eq) {
+        Exp(.get) { "extrude" }
+        "true"
+    }
+    layer.fillExtrusionColor = .constant(StyleColor(UIColor(red: 34/255, green: 34/255, blue: 40/255, alpha: 1)))
+    layer.fillExtrusionHeight = .expression(Exp(.get) { "height" })
+    layer.fillExtrusionBase = .expression(Exp(.get) { "min_height" })
+    layer.fillExtrusionOpacity = .constant(0.9)
+
+    let position: LayerPosition? = map.layerExists(withId: "road-major") ? .above("road-major") : nil
+    try? map.addLayer(layer, layerPosition: position)
 }
 
 // MARK: - View controller
