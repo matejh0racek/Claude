@@ -24,11 +24,24 @@ fi
 sed -i '' 's/^let carScale: Double = .*/let carScale: Double = 1.5/' GTINav/ViewController.swift
 grep -n "polo-gti\|carScale: Double\|carRotation: Double" GTINav/ViewController.swift
 
+if grep -q "PASTE_YOUR_PUBLIC_MAPBOX_TOKEN_HERE" GTINav/Info.plist; then
+  echo "!!! Your Mapbox token is not set on this Mac, so routes will not load."
+  echo "    Run this with your pk. token, then run this script again:"
+  echo "    /usr/libexec/PlistBuddy -c \"Set :MBXAccessToken pk.YOUR_TOKEN\" $(pwd)/GTINav/Info.plist"
+  exit 1
+fi
+
 echo "=== 3/5 Building (takes a minute or two)"
 if ! xcodebuild -project GTINav.xcodeproj -scheme GTINav \
      -destination 'platform=iOS Simulator,name=iPhone 17' \
      -derivedDataPath build build > build.log 2>&1; then
   grep -E "error:" build.log | head -20
+  if grep -q "CoreSimulator is out of date" build.log; then
+    echo ""
+    echo "!!! Xcode was updated but its simulator parts were not. Fix with:"
+    echo "    sudo xcodebuild -runFirstLaunch"
+    echo "    (type your Mac password; nothing shows while typing), then run this script again."
+  fi
   echo "BUILD FAILED. Full log: $(pwd)/build.log"
   exit 1
 fi
