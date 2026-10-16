@@ -263,9 +263,7 @@ final class ViewController: UIViewController {
                     navigationMapView.puckType = .puck3D(Puck3DConfiguration(
                         model: MapboxMaps.Model(uri: carURL),
                         modelScale: .constant([carScale, carScale, carScale]),
-                        modelRotation: .constant([0, 0, carRotation]),
-                        modelCastShadows: .constant(false),
-                        modelReceiveShadows: .constant(false)
+                        modelRotation: .constant([0, 0, carRotation])
                     ))
                 }
             }

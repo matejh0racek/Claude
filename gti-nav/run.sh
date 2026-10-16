@@ -18,11 +18,16 @@ if (/^\/\/ MARK: - Map styles/) {
   print "// Car model on the map. Make carScale bigger or smaller if the car looks wrong,\n// and change carRotation (in degrees: 90, 180, 270) if it drives sideways or backwards.\nlet carScale: Double = 1.5\nlet carRotation: Double = 0\n\n";
 }
 if (/navigationMapView\.routeColor = gtiRed/) {
-  $_ .= "\n                // Your car instead of the arrow, if polo-gti.glb is in the GTINav folder.\n                if let carURL = Bundle.main.url(forResource: \"polo-gti\", withExtension: \"glb\") {\n                    navigationMapView.puckType = .puck3D(Puck3DConfiguration(\n                        model: MapboxMaps.Model(uri: carURL),\n                        modelScale: .constant([carScale, carScale, carScale]),\n                        modelRotation: .constant([0, 0, carRotation]),\n                        modelCastShadows: .constant(false),\n                        modelReceiveShadows: .constant(false)\n                    ))\n                }\n";
+  $_ .= "\n                // Your car instead of the arrow, if polo-gti.glb is in the GTINav folder.\n                if let carURL = Bundle.main.url(forResource: \"polo-gti\", withExtension: \"glb\") {\n                    navigationMapView.puckType = .puck3D(Puck3DConfiguration(\n                        model: MapboxMaps.Model(uri: carURL),\n                        modelScale: .constant([carScale, carScale, carScale]),\n                        modelRotation: .constant([0, 0, carRotation])\n                    ))\n                }\n";
 }' GTINav/ViewController.swift
 fi
+# Older versions of this script used shadow options that do not compile; remove them.
+if grep -q "modelCastShadows" GTINav/ViewController.swift; then
+  echo "Fixing car code from an earlier version"
+  perl -0pi -e 's/(modelRotation: \.constant\(\[0, 0, carRotation\]\)),\n\s*modelCastShadows: \.constant\(false\),\n\s*modelReceiveShadows: \.constant\(false\)\n/$1\n/' GTINav/ViewController.swift
+fi
 sed -i '' 's/^let carScale: Double = .*/let carScale: Double = 1.5/' GTINav/ViewController.swift
-grep -n "polo-gti\|carScale: Double\|carRotation: Double" GTINav/ViewController.swift
+grep -n "polo-gti\|Shadows\|carScale: Double\|carRotation: Double" GTINav/ViewController.swift
 
 if grep -q "PASTE_YOUR_PUBLIC_MAPBOX_TOKEN_HERE" GTINav/Info.plist; then
   echo "!!! Your Mapbox token is not set on this Mac, so routes will not load."
