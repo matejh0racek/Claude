@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")"
 
-RAW="https://raw.githubusercontent.com/matejh0racek/Claude/claude/clever-hamilton-yjdmv4/gti-nav"
+RAW="${GTI_RAW:-https://raw.githubusercontent.com/matejh0racek/Claude/claude/clever-hamilton-yjdmv4/gti-nav}"
 
 echo "=== 1/5 Downloading the car model"
 curl -fsSL -o GTINav/polo-gti.glb "$RAW/GTINav/polo-gti.glb"
