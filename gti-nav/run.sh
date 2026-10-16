@@ -10,24 +10,17 @@ echo "=== 1/5 Downloading the car model"
 curl -fsSL -o GTINav/polo-gti.glb "$RAW/GTINav/polo-gti.glb"
 ls -l GTINav/polo-gti.glb
 
-echo "=== 2/5 Checking the car code in ViewController.swift"
-if ! grep -q "polo-gti" GTINav/ViewController.swift; then
-  echo "Car code missing, adding it"
-  perl -i -pe '
-if (/^\/\/ MARK: - Map styles/) {
-  print "// Car model on the map. Make carScale bigger or smaller if the car looks wrong,\n// and change carRotation (in degrees: 90, 180, 270) if it drives sideways or backwards.\nlet carScale: Double = 1.5\nlet carRotation: Double = 0\n\n";
-}
-if (/navigationMapView\.routeColor = gtiRed/) {
-  $_ .= "\n                // Your car instead of the arrow, if polo-gti.glb is in the GTINav folder.\n                if let carURL = Bundle.main.url(forResource: \"polo-gti\", withExtension: \"glb\") {\n                    navigationMapView.puckType = .puck3D(Puck3DConfiguration(\n                        model: MapboxMaps.Model(uri: carURL),\n                        modelScale: .constant([carScale, carScale, carScale]),\n                        modelRotation: .constant([0, 0, carRotation])\n                    ))\n                }\n";
-}' GTINav/ViewController.swift
+echo "=== 2/5 Updating ViewController.swift (Liquid Glass bars + car)"
+# Keep a backup of the current file and carry over your Mapbox Studio style URL.
+[ -f GTINav/ViewController.swift.bak ] || cp GTINav/ViewController.swift GTINav/ViewController.swift.bak
+STYLE_LINE="$(grep '^let studioStyleURL' GTINav/ViewController.swift || true)"
+curl -fsSL -o GTINav/ViewController.swift "$RAW/GTINav/ViewController.swift"
+if [ -n "$STYLE_LINE" ]; then
+  GTI_STYLE_LINE="$STYLE_LINE" perl -pi -e 's/^let studioStyleURL.*$/$ENV{GTI_STYLE_LINE}/' GTINav/ViewController.swift
 fi
-# Older versions of this script used shadow options that do not compile; remove them.
-if grep -q "modelCastShadows" GTINav/ViewController.swift; then
-  echo "Fixing car code from an earlier version"
-  perl -0pi -e 's/(modelRotation: \.constant\(\[0, 0, carRotation\]\)),\n\s*modelCastShadows: \.constant\(false\),\n\s*modelReceiveShadows: \.constant\(false\)\n/$1\n/' GTINav/ViewController.swift
-fi
-sed -i '' 's/^let carScale: Double = .*/let carScale: Double = 1.5/' GTINav/ViewController.swift
-grep -n "polo-gti\|Shadows\|carScale: Double\|carRotation: Double" GTINav/ViewController.swift
+grep -c "UIGlassEffect" GTINav/ViewController.swift >/dev/null && echo "Liquid Glass code: present"
+grep -c "polo-gti" GTINav/ViewController.swift >/dev/null && echo "Car code: present"
+echo "(Your previous version is saved as GTINav/ViewController.swift.bak)"
 
 if grep -q "PASTE_YOUR_PUBLIC_MAPBOX_TOKEN_HERE" GTINav/Info.plist; then
   echo "!!! Your Mapbox token is not set on this Mac, so routes will not load."
