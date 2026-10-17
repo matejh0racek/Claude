@@ -186,14 +186,16 @@ final class GTINavigationViewController: NavigationViewController {
 
         configureCamera(navigationMapView)
 
-        // End navigation: a round glass ✕ under the other map buttons (mute, feedback).
+        // End navigation: a round glass ✕ under the route-overview button.
         let endButton: FloatingButton = .rounded(image: UIImage(
             systemName: "xmark",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
         ))
         endButton.accessibilityLabel = "End navigation"
         endButton.addTarget(self, action: #selector(endNavigationTapped), for: .touchUpInside)
-        floatingButtons = (floatingButtons ?? []) + [endButton]
+        // The SDK's buttons are [route overview, mute, feedback]. Keep only route overview.
+        floatingButtons = Array((floatingButtons ?? []).prefix(1)) + [endButton]
+        showsReportFeedback = false
 
         // Styles can reload (for example day/night), so add the buildings every time one loads.
         guard let map = navigationMapView.mapView.mapboxMap else { return }
@@ -241,7 +243,7 @@ final class GTINavigationViewController: NavigationViewController {
             )
         }
 
-        // Round buttons on the map: overview, mute, feedback, end navigation, and Resume.
+        // Round buttons on the map: route overview, end navigation, and Resume.
         for button in navigationView.allSubviews(ofType: FloatingButton.self) {
             button.addGTIGlass(.capsule)
         }
