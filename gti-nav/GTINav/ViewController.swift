@@ -186,12 +186,25 @@ final class GTINavigationViewController: NavigationViewController {
 
         configureCamera(navigationMapView)
 
+        // End navigation: a round glass ✕ under the other map buttons (mute, feedback).
+        let endButton: FloatingButton = .rounded(image: UIImage(
+            systemName: "xmark",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
+        ))
+        endButton.accessibilityLabel = "End navigation"
+        endButton.addTarget(self, action: #selector(endNavigationTapped), for: .touchUpInside)
+        floatingButtons = (floatingButtons ?? []) + [endButton]
+
         // Styles can reload (for example day/night), so add the buildings every time one loads.
         guard let map = navigationMapView.mapView.mapboxMap else { return }
         map.onStyleLoaded.observe { [weak map] _ in
             if let map { add3DBuildings(to: map) }
         }.store(in: &styleObservers)
         if map.isStyleLoaded { add3DBuildings(to: map) }
+    }
+
+    @objc private func endNavigationTapped() {
+        didTapCancel(self)
     }
 
     private func configureCamera(_ navigationMapView: NavigationMapView) {
@@ -228,7 +241,7 @@ final class GTINavigationViewController: NavigationViewController {
             )
         }
 
-        // Round buttons on the map: mute, feedback, overview, and Resume.
+        // Round buttons on the map: overview, mute, feedback, end navigation, and Resume.
         for button in navigationView.allSubviews(ofType: FloatingButton.self) {
             button.addGTIGlass(.capsule)
         }
@@ -241,11 +254,10 @@ final class GTINavigationViewController: NavigationViewController {
 // MARK: - Bottom bar
 
 // Replaces the SDK's bottom bar: three even columns with the arrival time large in the middle.
-//   [ 11 min ]   [ 20:37 ]   [ 5,2 km ]   ✕
+//   [ 11 min ]   [ 20:37 ]   [ 5,2 km ]
 //     time       ARRIVAL      distance
+// Ending navigation is the ✕ button on the map, so the three columns stay perfectly even.
 final class GTIBottomBanner: UIViewController, NavigationComponent {
-    var onCancel: (() -> Void)?
-
     private let card = UIView()
     private let timeValue = UILabel()
     private let arrivalValue = UILabel()
@@ -284,20 +296,6 @@ final class GTIBottomBanner: UIViewController, NavigationComponent {
         columns.translatesAutoresizingMaskIntoConstraints = false
         card.addSubview(columns)
 
-        let divider = UIView()
-        divider.backgroundColor = UIColor.white.withAlphaComponent(0.15)
-        divider.translatesAutoresizingMaskIntoConstraints = false
-        card.addSubview(divider)
-
-        let cancelButton = UIButton(type: .system)
-        cancelButton.setImage(UIImage(systemName: "xmark", withConfiguration:
-            UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)), for: .normal)
-        cancelButton.tintColor = .white
-        cancelButton.accessibilityLabel = "End navigation"
-        cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
-        cancelButton.translatesAutoresizingMaskIntoConstraints = false
-        card.addSubview(cancelButton)
-
         NSLayoutConstraint.activate([
             card.topAnchor.constraint(equalTo: view.topAnchor),
             card.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
@@ -305,18 +303,8 @@ final class GTIBottomBanner: UIViewController, NavigationComponent {
             card.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -4),
             card.heightAnchor.constraint(equalToConstant: 84),
 
-            cancelButton.trailingAnchor.constraint(equalTo: card.trailingAnchor),
-            cancelButton.topAnchor.constraint(equalTo: card.topAnchor),
-            cancelButton.bottomAnchor.constraint(equalTo: card.bottomAnchor),
-            cancelButton.widthAnchor.constraint(equalToConstant: 64),
-
-            divider.trailingAnchor.constraint(equalTo: cancelButton.leadingAnchor),
-            divider.widthAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
-            divider.topAnchor.constraint(equalTo: card.topAnchor, constant: 18),
-            divider.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -18),
-
-            columns.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 8),
-            columns.trailingAnchor.constraint(equalTo: divider.leadingAnchor, constant: -4),
+            columns.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 12),
+            columns.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -12),
             columns.centerYAnchor.constraint(equalTo: card.centerYAnchor),
         ])
 
@@ -345,10 +333,6 @@ final class GTIBottomBanner: UIViewController, NavigationComponent {
         stack.alignment = .center
         stack.spacing = emphasised ? 0 : 2
         return stack
-    }
-
-    @objc private func cancelTapped() {
-        onCancel?()
     }
 
     // Called by the SDK on every location update.
@@ -452,10 +436,6 @@ final class ViewController: UIViewController {
                 navigationOptions: navigationOptions
             )
             navigationViewController.delegate = self
-            bottomBanner.onCancel = { [weak navigationViewController] in
-                guard let navigationViewController else { return }
-                navigationViewController.didTapCancel(navigationViewController)
-            }
             navigationViewController.modalPresentationStyle = .fullScreen
 
             // After each progress update the SDK repaints the main route with a traffic
