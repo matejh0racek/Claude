@@ -205,6 +205,45 @@ final class GTINavigationViewController: NavigationViewController {
         if map.isStyleLoaded { add3DBuildings(to: map) }
     }
 
+    // Waze-style framing: the car sits centred left-to-right and about 70% of the way down the
+    // screen, so most of the view shows the road ahead. The SDK's own padding puts the car just
+    // above the bottom bar and shifts it left to make room for the map buttons.
+    private let carScreenPosition: CGFloat = 0.70
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        applyWazeFraming()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        applyWazeFraming()
+    }
+
+    private func applyWazeFraming() {
+        guard let navigationMapView, isViewLoaded, view.window != nil else { return }
+        let height = navigationMapView.bounds.height
+        guard height > 0 else { return }
+        let safeArea = navigationMapView.safeAreaInsets
+
+        // Everything below is measured from the top of the screen.
+        let bottomEdge = navigationView.bottomBannerContainerView.bounds.height + 8
+        let carY = height * carScreenPosition
+        // The car ends up in the middle of the padded area, so mirror the bottom edge around it.
+        let topEdge = max(0, 2 * carY - height + bottomEdge)
+
+        // viewportPadding is added on top of the safe area.
+        let padding = UIEdgeInsets(
+            top: max(0, topEdge - safeArea.top),
+            left: 0,
+            bottom: max(0, bottomEdge - safeArea.bottom),
+            right: 0
+        )
+        if navigationMapView.viewportPadding != padding {
+            navigationMapView.viewportPadding = padding
+        }
+    }
+
     @objc private func endNavigationTapped() {
         didTapCancel(self)
     }
@@ -221,7 +260,7 @@ final class GTINavigationViewController: NavigationViewController {
         following.geometryFramingAfterManeuver.enabled = false
         // Zoom still follows the road ahead: closer through junctions and short streets, further out on
         // long straights, but always close enough to feel like driving (SDK default: 10.5...16.35).
-        following.zoomRange = 15.6...18.2
+        following.zoomRange = 16.4...18.4
         dataSource.options.followingCameraOptions = following
     }
 
@@ -425,6 +464,9 @@ final class ViewController: UIViewController {
         case .failure(let error):
             print("Route request failed: \(error.localizedDescription)")
         case .success(let navigationRoutes):
+            // No spoken directions.
+            navigationProvider.routeVoiceController.speechSynthesizer.muted = true
+
             let bottomBanner = GTIBottomBanner()
             let navigationOptions = NavigationOptions(
                 mapboxNavigation: mapboxNavigation,
