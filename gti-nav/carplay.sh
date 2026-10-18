@@ -5,7 +5,9 @@
 set -e
 cd "$(dirname "$0")"
 
-DEVICE_NAME="GTI iPhone (iOS 26)"
+# Pick the iOS version with GTI_IOS, e.g. GTI_IOS=26.0 (default: newest iOS 26 installed).
+IOS="${GTI_IOS:-26}"
+DEVICE_NAME="GTI iPhone (iOS $IOS)"
 
 echo "=== 1/5 Finding the classic Simulator app (inside Xcode 26)"
 SIM26="$(find /Applications -maxdepth 6 -path '*Xcode*26*' -name Simulator.app 2>/dev/null | head -1)"
@@ -15,22 +17,27 @@ if [ -z "$SIM26" ]; then
 fi
 echo "$SIM26"
 
-echo "=== 2/5 Getting the iOS 26 simulator (a few GB the first time)"
-RUNTIME="$(xcrun simctl list runtimes | grep -E '^iOS 26\.' | grep -v unavailable | tail -1 | grep -oE 'com\.apple\.CoreSimulator\.SimRuntime\.iOS-26-[0-9-]+' || true)"
+echo "=== 2/5 Getting the iOS $IOS simulator (a few GB the first time)"
+find_runtime() {
+  xcrun simctl list runtimes | grep -E "^iOS ${IOS//./\\.}([. ]|$)" | grep -v unavailable | tail -1 \
+    | grep -oE 'com\.apple\.CoreSimulator\.SimRuntime\.iOS-[0-9-]+' || true
+}
+RUNTIME="$(find_runtime)"
 if [ -z "$RUNTIME" ]; then
-  for VERSION in 26.4 26.3 26.2 26.1 26.0; do
+  if [ "$IOS" = "26" ]; then VERSIONS="26.4 26.3 26.2 26.1 26.0"; else VERSIONS="$IOS"; fi
+  for VERSION in $VERSIONS; do
     echo "Trying iOS $VERSION ..."
     if xcodebuild -downloadPlatform iOS -buildVersion "$VERSION"; then break; fi
   done
-  RUNTIME="$(xcrun simctl list runtimes | grep -E '^iOS 26\.' | grep -v unavailable | tail -1 | grep -oE 'com\.apple\.CoreSimulator\.SimRuntime\.iOS-26-[0-9-]+' || true)"
+  RUNTIME="$(find_runtime)"
 fi
 if [ -z "$RUNTIME" ]; then
-  echo "!!! Could not download an iOS 26 simulator. Paste the output above to Claude."
+  echo "!!! Could not download an iOS $IOS simulator. Paste the output above to Claude."
   exit 1
 fi
 echo "$RUNTIME"
 
-echo "=== 3/5 Creating the iOS 26 iPhone"
+echo "=== 3/5 Creating the iOS $IOS iPhone"
 UDID="$(xcrun simctl list devices | grep -F "$DEVICE_NAME (" | grep -oE '[0-9A-F-]{36}' | head -1 || true)"
 if [ -z "$UDID" ]; then
   UDID="$(xcrun simctl create "$DEVICE_NAME" "iPhone 17" "$RUNTIME")"
