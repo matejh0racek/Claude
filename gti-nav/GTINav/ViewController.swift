@@ -31,6 +31,22 @@ let gtiAlternateGrey = UIColor(red: 90/255, green: 90/255, blue: 98/255, alpha: 
 let carScale: Double = 2.4
 let carRotation: Double = 0
 
+// MARK: - Navigation engine (shared by the iPhone screen and CarPlay)
+
+// There can only be one navigation engine per app, so the phone and CarPlay both use this one.
+// .simulation drives the route for you, so you can test at your desk.
+// Change to `.live` when you want to use real GPS in the car.
+@MainActor
+let gtiNavigationProvider: MapboxNavigationProvider = {
+    let provider = MapboxNavigationProvider(
+        coreConfig: .init(locationSource: .simulation(initialLocation: CLLocation(
+            latitude: testOrigin.latitude, longitude: testOrigin.longitude)))
+    )
+    // No spoken directions.
+    provider.routeVoiceController.speechSynthesizer.muted = true
+    return provider
+}()
+
 // MARK: - Map styles (same dark style day and night, like the GTI cluster)
 
 // Both styles subclass NightStyle so the banners and buttons stay dark during the day too.
@@ -178,13 +194,13 @@ extension UIView {
 // Same as the SDK's NavigationViewController, with glass behind the banners and buttons,
 // 3D buildings and a camera that zooms and tilts more with the road ahead.
 final class GTINavigationViewController: NavigationViewController {
-    private var styleObservers = Set<AnyCancelable>()
-
     override func viewDidLoad() {
         super.viewDidLoad()
         guard let navigationMapView else { return }
 
-        configureCamera(navigationMapView)
+        if let dataSource = navigationMapView.navigationCamera.viewportDataSource as? MobileViewportDataSource {
+            applyGTICameraOptions(to: &dataSource.options)
+        }
 
         // End navigation: a round glass ✕ under the route-overview button.
         let endButton: FloatingButton = .rounded(image: UIImage(
@@ -197,12 +213,6 @@ final class GTINavigationViewController: NavigationViewController {
         floatingButtons = Array((floatingButtons ?? []).prefix(1)) + [endButton]
         showsReportFeedback = false
 
-        // Styles can reload (for example day/night), so add the buildings every time one loads.
-        guard let map = navigationMapView.mapView.mapboxMap else { return }
-        map.onStyleLoaded.observe { [weak map] _ in
-            if let map { add3DBuildings(to: map) }
-        }.store(in: &styleObservers)
-        if map.isStyleLoaded { add3DBuildings(to: map) }
     }
 
     // Waze-style framing: the car sits centred left-to-right and about 70% of the way down the
@@ -246,22 +256,6 @@ final class GTINavigationViewController: NavigationViewController {
 
     @objc private func endNavigationTapped() {
         didTapCancel(self)
-    }
-
-    private func configureCamera(_ navigationMapView: NavigationMapView) {
-        guard let dataSource = navigationMapView.navigationCamera.viewportDataSource as? MobileViewportDataSource
-        else { return }
-        var following = dataSource.options.followingCameraOptions
-        // Driver's-eye view like Waze: always tilted, never flattening to top-down (SDK default: 45°).
-        following.defaultPitch = 62
-        // The SDK normally flattens the camera to top-down before each turn and zooms out to show the
-        // road after it. Turn both off so the perspective stays steady through turns.
-        following.pitchNearManeuver.enabled = false
-        following.geometryFramingAfterManeuver.enabled = false
-        // Zoom still follows the road ahead: closer through junctions and short streets, further out on
-        // long straights, but always close enough to feel like driving (SDK default: 10.5...16.35).
-        following.zoomRange = 16.4...18.4
-        dataSource.options.followingCameraOptions = following
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -397,6 +391,51 @@ final class GTIBottomBanner: UIViewController, NavigationComponent {
     }
 }
 
+// MARK: - Shared map look (iPhone and CarPlay)
+
+// Keeps the style-load observers alive for as long as the app runs.
+@MainActor private var gtiStyleObservers = Set<AnyCancelable>()
+
+// Red route without traffic colours, the white Polo instead of the arrow, and 3D buildings.
+@MainActor
+func applyGTIMapLook(to navigationMapView: NavigationMapView) {
+    // After each progress update the SDK repaints the main route with a traffic
+    // gradient, which would replace the red core. With traffic off, that gradient
+    // is a single color: routeColor.
+    navigationMapView.showsTrafficOnRouteLine = false
+    navigationMapView.routeColor = gtiRed
+
+    // Your car instead of the arrow, if polo-gti.glb is in the GTINav folder.
+    if let carURL = Bundle.main.url(forResource: "polo-gti", withExtension: "glb") {
+        navigationMapView.puckType = .puck3D(Puck3DConfiguration(
+            model: MapboxMaps.Model(uri: carURL),
+            modelScale: .constant([carScale, carScale, carScale]),
+            modelRotation: .constant([0, 0, carRotation])
+        ))
+    }
+
+    // Styles can reload (for example day/night), so add the buildings every time one loads.
+    guard let map = navigationMapView.mapView.mapboxMap else { return }
+    map.onStyleLoaded.observe { [weak map] _ in
+        if let map { add3DBuildings(to: map) }
+    }.store(in: &gtiStyleObservers)
+    if map.isStyleLoaded { add3DBuildings(to: map) }
+}
+
+func applyGTICameraOptions(to options: inout NavigationViewportDataSourceOptions) {
+    var following = options.followingCameraOptions
+    // Driver's-eye view like Waze: always tilted, never flattening to top-down (SDK default: 45°).
+    following.defaultPitch = 62
+    // The SDK normally flattens the camera to top-down before each turn and zooms out to show the
+    // road after it. Turn both off so the perspective stays steady through turns.
+    following.pitchNearManeuver.enabled = false
+    following.geometryFramingAfterManeuver.enabled = false
+    // Zoom still follows the road ahead: closer through junctions and short streets, further out on
+    // long straights, but always close enough to feel like driving (SDK default: 10.5...16.35).
+    following.zoomRange = 16.4...18.4
+    options.followingCameraOptions = following
+}
+
 // MARK: - 3D buildings
 
 // Dark grey extruded buildings from Mapbox Streets, drawn above the roads and below the
@@ -426,13 +465,8 @@ private func add3DBuildings(to map: MapboxMap) {
 
 final class ViewController: UIViewController {
 
-    // .simulation drives the route for you, so you can test at your desk.
-    // Change to `.live` when you want to use real GPS in the car.
-    private let navigationProvider = MapboxNavigationProvider(
-        coreConfig: .init(locationSource: .simulation(initialLocation: CLLocation(
-            latitude: testOrigin.latitude, longitude: testOrigin.longitude)))
-    )
-    private lazy var mapboxNavigation = navigationProvider.mapboxNavigation
+    private var navigationProvider: MapboxNavigationProvider { gtiNavigationProvider }
+    private var mapboxNavigation: MapboxNavigation { navigationProvider.mapboxNavigation }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -464,9 +498,6 @@ final class ViewController: UIViewController {
         case .failure(let error):
             print("Route request failed: \(error.localizedDescription)")
         case .success(let navigationRoutes):
-            // No spoken directions.
-            navigationProvider.routeVoiceController.speechSynthesizer.muted = true
-
             let bottomBanner = GTIBottomBanner()
             let navigationOptions = NavigationOptions(
                 mapboxNavigation: mapboxNavigation,
@@ -482,69 +513,69 @@ final class ViewController: UIViewController {
             navigationViewController.delegate = self
             navigationViewController.modalPresentationStyle = .fullScreen
 
-            // After each progress update the SDK repaints the main route with a traffic
-            // gradient, which would replace the red core. With traffic off, that gradient
-            // is a single color: routeColor.
             if let navigationMapView = navigationViewController.navigationMapView {
-                navigationMapView.showsTrafficOnRouteLine = false
-                navigationMapView.routeColor = gtiRed
-
-                // Your car instead of the arrow, if polo-gti.glb is in the GTINav folder.
-                if let carURL = Bundle.main.url(forResource: "polo-gti", withExtension: "glb") {
-                    navigationMapView.puckType = .puck3D(Puck3DConfiguration(
-                        model: MapboxMaps.Model(uri: carURL),
-                        modelScale: .constant([carScale, carScale, carScale]),
-                        modelRotation: .constant([0, 0, carRotation])
-                    ))
-                }
+                applyGTIMapLook(to: navigationMapView)
             }
 
             present(navigationViewController, animated: true)
+
+            // If CarPlay is connected, show the same drive on the car screen.
+            if CarPlayManager.isConnected {
+                GTICarPlay.shared.manager.beginNavigationWithCarPlay(using: testOrigin)
+            }
         }
     }
 }
 
 // MARK: - Glowing red route
 
-// These delegate methods are also called for alternative routes. Returning nil there
+// These layer functions are also called for alternative routes. Returning nil there
 // keeps the SDK's default (grey) layers, so only the main route glows.
 private func isMainRoute(_ layerIdentifier: String) -> Bool {
     layerIdentifier.hasPrefix("com.mapbox.navigation.route_line.main")
 }
 
+// Top layer: sharp, solid red core.
+func gtiRouteLineLayer(identifier: String, sourceIdentifier: String) -> LineLayer? {
+    guard isMainRoute(identifier) else { return nil }
+    var layer = LineLayer(id: identifier, source: sourceIdentifier)
+    layer.lineColor = .constant(StyleColor(gtiRed))
+    layer.lineWidth = .constant(6)
+    layer.lineOpacity = .constant(1.0)
+    layer.lineCap = .constant(.round)
+    layer.lineJoin = .constant(.round)
+    return layer
+}
+
+// Bottom layer: wide, blurred, see-through red. This is the glow.
+func gtiRouteCasingLayer(identifier: String, sourceIdentifier: String) -> LineLayer? {
+    guard isMainRoute(identifier) else { return nil }
+    var layer = LineLayer(id: identifier, source: sourceIdentifier)
+    layer.lineColor = .constant(StyleColor(gtiRed))
+    layer.lineWidth = .constant(22)
+    layer.lineBlur = .constant(10)
+    layer.lineOpacity = .constant(0.25)
+    layer.lineCap = .constant(.round)
+    layer.lineJoin = .constant(.round)
+    return layer
+}
+
 extension ViewController: NavigationViewControllerDelegate {
 
-    // Top layer: sharp, solid red core.
     func navigationViewController(
         _ navigationViewController: NavigationViewController,
         routeLineLayerWithIdentifier identifier: String,
         sourceIdentifier: String
     ) -> LineLayer? {
-        guard isMainRoute(identifier) else { return nil }
-        var layer = LineLayer(id: identifier, source: sourceIdentifier)
-        layer.lineColor = .constant(StyleColor(gtiRed))
-        layer.lineWidth = .constant(6)
-        layer.lineOpacity = .constant(1.0)
-        layer.lineCap = .constant(.round)
-        layer.lineJoin = .constant(.round)
-        return layer
+        gtiRouteLineLayer(identifier: identifier, sourceIdentifier: sourceIdentifier)
     }
 
-    // Bottom layer: wide, blurred, see-through red. This is the glow.
     func navigationViewController(
         _ navigationViewController: NavigationViewController,
         routeCasingLineLayerWithIdentifier identifier: String,
         sourceIdentifier: String
     ) -> LineLayer? {
-        guard isMainRoute(identifier) else { return nil }
-        var layer = LineLayer(id: identifier, source: sourceIdentifier)
-        layer.lineColor = .constant(StyleColor(gtiRed))
-        layer.lineWidth = .constant(22)
-        layer.lineBlur = .constant(10)
-        layer.lineOpacity = .constant(0.25)
-        layer.lineCap = .constant(.round)
-        layer.lineJoin = .constant(.round)
-        return layer
+        gtiRouteCasingLayer(identifier: identifier, sourceIdentifier: sourceIdentifier)
     }
 
     func navigationViewControllerDidDismiss(

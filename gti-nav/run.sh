@@ -18,6 +18,26 @@ curl -fsSL -o GTINav/ViewController.swift "$RAW/GTINav/ViewController.swift"
 if [ -n "$STYLE_LINE" ]; then
   GTI_STYLE_LINE="$STYLE_LINE" perl -pi -e 's/^let studioStyleURL.*$/$ENV{GTI_STYLE_LINE}/' GTINav/ViewController.swift
 fi
+# CarPlay support: new and updated source files, the CarPlay permission (simulator only)
+# and the CarPlay screen entry in Info.plist. Each step is skipped if it is already done.
+curl -fsSL -o GTINav/CarPlay.swift "$RAW/GTINav/CarPlay.swift"
+curl -fsSL -o GTINav/AppDelegate.swift "$RAW/GTINav/AppDelegate.swift"
+curl -fsSL -o GTINav.entitlements "$RAW/GTINav.entitlements"
+if ! grep -q "CODE_SIGN_ENTITLEMENTS" GTINav.xcodeproj/project.pbxproj; then
+  perl -pi -e 's/^(\s*)(INFOPLIST_FILE = GTINav\/Info\.plist;)/$1"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = GTINav.entitlements;\n$1$2/' GTINav.xcodeproj/project.pbxproj
+fi
+PB=/usr/libexec/PlistBuddy
+CP_KEY=":UIApplicationSceneManifest:UISceneConfigurations:CPTemplateApplicationSceneSessionRoleApplication"
+if ! $PB -c "Print $CP_KEY" GTINav/Info.plist >/dev/null 2>&1; then
+  $PB -c "Add $CP_KEY array" \
+      -c "Add $CP_KEY:0 dict" \
+      -c "Add $CP_KEY:0:UISceneClassName string CPTemplateApplicationScene" \
+      -c "Add $CP_KEY:0:UISceneConfigurationName string CarPlay" \
+      -c 'Add '"$CP_KEY"':0:UISceneDelegateClassName string $(PRODUCT_MODULE_NAME).CarPlaySceneDelegate' \
+      GTINav/Info.plist
+fi
+grep -q "CarPlaySceneDelegate" GTINav/Info.plist && echo "CarPlay: set up"
+
 grep -c "UIGlassEffect" GTINav/ViewController.swift >/dev/null && echo "Liquid Glass code: present"
 grep -c "polo-gti" GTINav/ViewController.swift >/dev/null && echo "Car code: present"
 echo "(Your previous version is saved as GTINav/ViewController.swift.bak)"
@@ -57,3 +77,5 @@ echo "=== 5/5 Installing and launching GTI Nav"
 xcrun simctl install booted "$APP"
 xcrun simctl launch --terminate-running-process booted com.matejhoracek.GTINav
 echo "=== Done. In the simulator, tap 'Start test drive'."
+echo "    CarPlay: in the Simulator menu bar choose I/O > External Displays > CarPlay,"
+echo "    open GTI Nav on the car screen and press 'Test drive'."
