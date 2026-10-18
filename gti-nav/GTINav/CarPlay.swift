@@ -3,7 +3,9 @@ import CoreLocation
 import MapboxDirections
 import MapboxMaps
 import MapboxNavigationCore
-import MapboxNavigationUIKit
+// The CarPlay delegate has two internal requirements whose default versions are only visible
+// through this SPI import (the SDK's own CarPlay example imports it the same way).
+@_spi(MapboxCarPlayInternal) import MapboxNavigationUIKit
 import UIKit
 
 // MARK: - CarPlay
@@ -52,6 +54,25 @@ extension GTICarPlay: CarPlayManagerDelegate {
             self?.startTestDrive {}
         }
         return [testDriveButton]
+    }
+
+    // The browsing map (before a drive) is ready: apply the GTI look.
+    func carPlayManager(_ carPlayManager: CarPlayManager, didSetup navigationMapView: NavigationMapView) {
+        applyGTIMapLook(to: navigationMapView)
+        if let dataSource = navigationMapView.navigationCamera.viewportDataSource as? CarPlayViewportDataSource {
+            applyGTICameraOptions(to: &dataSource.options)
+        }
+    }
+
+    // Leading buttons: none (the SDK's internal variant that also receives the camera state).
+    func carPlayManager(
+        _ carPlayManager: CarPlayManager,
+        leadingNavigationBarButtonsCompatibleWith traitCollection: UITraitCollection,
+        in carPlayTemplate: CPMapTemplate,
+        for activity: CarPlayActivity,
+        cameraState: NavigationCameraState
+    ) -> [CPBarButton]? {
+        nil
     }
 
     // Apply the GTI look to the turn-by-turn map once CarPlay shows it.
