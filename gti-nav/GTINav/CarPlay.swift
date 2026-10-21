@@ -41,10 +41,35 @@ final class GTICarPlay: NSObject {
     }
 
     // Same test route as the phone: from the current (simulated) position to Výstaviště Brno.
-    func startTestDrive(completion: @escaping () -> Void) {
+    // CarPlay's route preview has a green Go button whose colour apps can't change, so start
+    // driving as soon as the route is ready instead (the same thing pressing Go does).
+    func startTestDrive() {
         let destination = Waypoint(coordinate: testDestination, name: "Výstaviště Brno")
-        manager.previewRoutes(to: destination, completionHandler: completion)
+        manager.previewRoutes(to: destination) { [weak self] in
+            MainActor.assumeIsolated { self?.startPreviewedTrip() }
+        }
     }
+
+    private func startPreviewedTrip() {
+        guard let activeTrip,
+              let routeChoice = activeTrip.routeChoices.first,
+              let previewTemplate = manager.interfaceController?.topTemplate as? CPMapTemplate else { return }
+        manager.mapTemplate(previewTemplate, startedTrip: activeTrip, using: routeChoice)
+    }
+
+    // Route overview on/off. Uses an SF Symbol so CarPlay draws it on its own glass button,
+    // like its other controls (the SDK's images bring their own square backgrounds).
+    private lazy var overviewButton: CPMapButton = {
+        let button = CPMapButton { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let camera = self?.manager.carPlayNavigationViewController?.navigationMapView?.navigationCamera
+                else { return }
+                camera.update(cameraState: camera.currentCameraState == .following ? .overview : .following)
+            }
+        }
+        button.image = UIImage(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+        return button
+    }()
 
     // The SDK colours the remaining time by traffic (usually green). CarPlay only offers Apple's
     // green, orange and red, none of which match the GTI red, so after each SDK update send the
@@ -87,9 +112,19 @@ extension GTICarPlay: CarPlayManagerDelegate {
     ) -> [CPBarButton]? {
         guard activity == .browsing else { return nil }
         let testDriveButton = CPBarButton(title: "Test drive") { [weak self] _ in
-            self?.startTestDrive {}
+            self?.startTestDrive()
         }
         return [testDriveButton]
+    }
+
+    // While driving: only the route overview button (no feedback button, same as the phone).
+    func carPlayManager(
+        _ carPlayManager: CarPlayManager,
+        mapButtonsCompatibleWith traitCollection: UITraitCollection,
+        in carPlayTemplate: CPTemplate,
+        for activity: CarPlayActivity
+    ) -> [CPMapButton]? {
+        activity == .navigating ? [overviewButton] : nil
     }
 
     // Remember the trip so its estimates can be shown in white once driving starts.
