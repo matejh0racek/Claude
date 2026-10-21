@@ -57,20 +57,6 @@ final class GTICarPlay: NSObject {
         manager.mapTemplate(previewTemplate, startedTrip: activeTrip, using: routeChoice)
     }
 
-    // Route overview on/off. Uses an SF Symbol so CarPlay draws it on its own glass button,
-    // like its other controls (the SDK's images bring their own square backgrounds).
-    private lazy var overviewButton: CPMapButton = {
-        let button = CPMapButton { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let camera = self?.manager.carPlayNavigationViewController?.navigationMapView?.navigationCamera
-                else { return }
-                camera.update(cameraState: camera.currentCameraState == .following ? .overview : .following)
-            }
-        }
-        button.image = UIImage(systemName: "point.topleft.down.to.point.bottomright.curvepath")
-        return button
-    }()
-
     // The SDK colours the remaining time by traffic (usually green). CarPlay only offers Apple's
     // green, orange and red, none of which match the GTI red, so after each SDK update send the
     // same estimates again in the default white.
@@ -110,6 +96,7 @@ extension GTICarPlay: CarPlayManagerDelegate {
         in carPlayTemplate: CPMapTemplate,
         for activity: CarPlayActivity
     ) -> [CPBarButton]? {
+        if activity == .navigating { return [] }
         guard activity == .browsing else { return nil }
         let testDriveButton = CPBarButton(title: "Test drive") { [weak self] _ in
             self?.startTestDrive()
@@ -117,14 +104,15 @@ extension GTICarPlay: CarPlayManagerDelegate {
         return [testDriveButton]
     }
 
-    // While driving: only the route overview button (no feedback button, same as the phone).
+    // While driving, everything is controlled from the phone, so CarPlay shows no map buttons
+    // (no route overview or feedback) and no bar buttons (no End, Unmute or Alternatives).
     func carPlayManager(
         _ carPlayManager: CarPlayManager,
         mapButtonsCompatibleWith traitCollection: UITraitCollection,
         in carPlayTemplate: CPTemplate,
         for activity: CarPlayActivity
     ) -> [CPMapButton]? {
-        activity == .navigating ? [overviewButton] : nil
+        activity == .navigating ? [] : nil
     }
 
     // Remember the trip so its estimates can be shown in white once driving starts.
@@ -146,7 +134,17 @@ extension GTICarPlay: CarPlayManagerDelegate {
         }
     }
 
-    // Leading buttons: none (the SDK's internal variant that also receives the camera state).
+    // Leading buttons (Unmute and Alternatives while driving): none while driving.
+    func carPlayManager(
+        _ carPlayManager: CarPlayManager,
+        leadingNavigationBarButtonsCompatibleWith traitCollection: UITraitCollection,
+        in carPlayTemplate: CPMapTemplate,
+        for activity: CarPlayActivity
+    ) -> [CPBarButton]? {
+        activity == .navigating ? [] : nil
+    }
+
+    // The SDK's internal variant of the above, called when the camera changes.
     func carPlayManager(
         _ carPlayManager: CarPlayManager,
         leadingNavigationBarButtonsCompatibleWith traitCollection: UITraitCollection,
@@ -154,7 +152,7 @@ extension GTICarPlay: CarPlayManagerDelegate {
         for activity: CarPlayActivity,
         cameraState: NavigationCameraState
     ) -> [CPBarButton]? {
-        nil
+        activity == .navigating ? [] : nil
     }
 
     // Apply the GTI look to the turn-by-turn map once CarPlay shows it.

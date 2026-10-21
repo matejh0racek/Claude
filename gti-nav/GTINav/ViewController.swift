@@ -606,6 +606,8 @@ extension ViewController: NavigationViewControllerDelegate {
         _ navigationViewController: NavigationViewController,
         byCanceling canceled: Bool
     ) {
+        // CarPlay has no End button, so ending on the phone ends the drive there too.
+        GTICarPlay.shared.manager.carPlayNavigationViewController?.exitNavigation(byCanceling: canceled)
         dismiss(animated: true)
     }
 }
