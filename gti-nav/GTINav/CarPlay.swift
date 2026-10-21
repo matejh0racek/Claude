@@ -34,7 +34,7 @@ final class GTICarPlay: NSObject {
     func styleBrowsingMap() {
         manager.carPlayMapViewController?.wayNameView?.label.superview?.addGTIGlass(.capsule)
         guard let navigationMapView = manager.carPlayMapViewController?.navigationMapView else { return }
-        applyGTIMapLook(to: navigationMapView)
+        applyGTIMapLook(to: navigationMapView, carSize: carPlayCarScale)
         if let dataSource = navigationMapView.navigationCamera.viewportDataSource as? CarPlayViewportDataSource {
             applyGTICameraOptions(to: &dataSource.options)
         }
@@ -46,23 +46,24 @@ final class GTICarPlay: NSObject {
         manager.previewRoutes(to: destination, completionHandler: completion)
     }
 
-    // The SDK colours the remaining time by traffic (usually green). After each of its updates,
-    // send the same estimates again in GTI red.
-    func startRedETA() {
+    // The SDK colours the remaining time by traffic (usually green). CarPlay only offers Apple's
+    // green, orange and red, none of which match the GTI red, so after each SDK update send the
+    // same estimates again in the default white.
+    func startWhiteETA() {
         etaObserver = gtiNavigationProvider.navigation().routeProgress
             .compactMap { $0?.routeProgress }
             .receive(on: DispatchQueue.main) // runs after the SDK's own update
             .sink { [weak self] progress in
-                MainActor.assumeIsolated { self?.showRedETA(progress) }
+                MainActor.assumeIsolated { self?.showWhiteETA(progress) }
             }
     }
 
-    func stopRedETA() {
+    func stopWhiteETA() {
         etaObserver = nil
         activeTrip = nil
     }
 
-    private func showRedETA(_ progress: RouteProgress) {
+    private func showWhiteETA(_ progress: RouteProgress) {
         guard let activeTrip,
               let template = manager.interfaceController?.rootTemplate as? CPMapTemplate else { return }
         let metres = progress.distanceRemaining
@@ -72,7 +73,7 @@ final class GTICarPlay: NSObject {
         // Like the SDK: "1 min" instead of "0 min" in the last minute.
         let seconds = progress.durationRemaining > 0 ? max(progress.durationRemaining, 60) : 0
         let estimates = CPTravelEstimates(distanceRemaining: distance, timeRemaining: seconds)
-        template.update(estimates, for: activeTrip, with: .red)
+        template.update(estimates, for: activeTrip, with: .default)
     }
 }
 
@@ -91,20 +92,20 @@ extension GTICarPlay: CarPlayManagerDelegate {
         return [testDriveButton]
     }
 
-    // Remember the trip so its estimates can be shown in red once driving starts.
+    // Remember the trip so its estimates can be shown in white once driving starts.
     func carPlayManager(_ carPlayManager: CarPlayManager, willPreview trip: CPTrip) -> CPTrip {
         activeTrip = trip
         return trip
     }
 
     func carPlayManagerWillEndNavigation(_ carPlayManager: CarPlayManager, byCanceling canceled: Bool) {
-        stopRedETA()
+        stopWhiteETA()
     }
 
     // The browsing map (before a drive) is ready: apply the GTI look.
     func carPlayManager(_ carPlayManager: CarPlayManager, didSetup navigationMapView: NavigationMapView) {
         carPlayManager.carPlayMapViewController?.wayNameView?.label.superview?.addGTIGlass(.capsule)
-        applyGTIMapLook(to: navigationMapView)
+        applyGTIMapLook(to: navigationMapView, carSize: carPlayCarScale)
         if let dataSource = navigationMapView.navigationCamera.viewportDataSource as? CarPlayViewportDataSource {
             applyGTICameraOptions(to: &dataSource.options)
         }
@@ -127,9 +128,9 @@ extension GTICarPlay: CarPlayManagerDelegate {
         didPresent navigationViewController: CarPlayNavigationViewController
     ) {
         navigationViewController.wayNameView?.label.superview?.addGTIGlass(.capsule)
-        startRedETA()
+        startWhiteETA()
         guard let navigationMapView = navigationViewController.navigationMapView else { return }
-        applyGTIMapLook(to: navigationMapView)
+        applyGTIMapLook(to: navigationMapView, carSize: carPlayCarScale)
         if let dataSource = navigationMapView.navigationCamera.viewportDataSource as? CarPlayViewportDataSource {
             applyGTICameraOptions(to: &dataSource.options)
         }

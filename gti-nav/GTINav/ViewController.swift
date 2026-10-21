@@ -29,6 +29,8 @@ let gtiAlternateGrey = UIColor(red: 90/255, green: 90/255, blue: 98/255, alpha: 
 // Car model on the map. Make carScale bigger or smaller if the car looks wrong,
 // and change carRotation (in degrees: 90, 180, 270) if it drives sideways or backwards.
 let carScale: Double = 3.4
+// CarPlay screens are smaller, so the car is smaller there.
+let carPlayCarScale: Double = 2.4
 let carRotation: Double = 0
 
 // MARK: - Navigation engine (shared by the iPhone screen and CarPlay)
@@ -231,6 +233,8 @@ final class GTINavigationViewController: NavigationViewController {
     // screen, so most of the view shows the road ahead. The SDK's own padding puts the car just
     // above the bottom bar and shifts it left to make room for the map buttons.
     private let carScreenPosition: CGFloat = 0.70
+    // Space between the car's position and the top of the street name, so the car stays visible.
+    private let carClearance: CGFloat = 70
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
@@ -250,7 +254,12 @@ final class GTINavigationViewController: NavigationViewController {
 
         // Everything below is measured from the top of the screen.
         let bottomEdge = navigationView.bottomBannerContainerView.bounds.height + 8
-        let carY = height * carScreenPosition
+        // Keep the car clear of the street name pill just above the bottom bar.
+        let wayNameView = navigationView.wayNameView
+        let wayNameTop = navigationMapView.convert(wayNameView.bounds, from: wayNameView).minY
+        let carY = wayNameTop > 0
+            ? min(height * carScreenPosition, wayNameTop - carClearance)
+            : height * carScreenPosition
         // The car ends up in the middle of the padded area, so mirror the bottom edge around it.
         let topEdge = max(0, 2 * carY - height + bottomEdge)
 
@@ -413,7 +422,7 @@ final class GTIBottomBanner: UIViewController, NavigationComponent {
 
 // Red route without traffic colours, the white Polo instead of the arrow, and 3D buildings.
 @MainActor
-func applyGTIMapLook(to navigationMapView: NavigationMapView) {
+func applyGTIMapLook(to navigationMapView: NavigationMapView, carSize: Double = carScale) {
     // After each progress update the SDK repaints the main route with a traffic
     // gradient, which would replace the red core. With traffic off, that gradient
     // is a single color: routeColor.
@@ -424,7 +433,7 @@ func applyGTIMapLook(to navigationMapView: NavigationMapView) {
     if let carURL = Bundle.main.url(forResource: "polo-gti", withExtension: "glb") {
         navigationMapView.puckType = .puck3D(Puck3DConfiguration(
             model: MapboxMaps.Model(uri: carURL),
-            modelScale: .constant([carScale, carScale, carScale]),
+            modelScale: .constant([carSize, carSize, carSize]),
             modelRotation: .constant([0, 0, carRotation])
         ))
     }
