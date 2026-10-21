@@ -1,4 +1,5 @@
 import CarPlay
+import Combine
 import CoreLocation
 import MapboxDirections
 import MapboxMaps
@@ -25,8 +26,13 @@ final class GTICarPlay: NSObject {
         return manager
     }()
 
+    // The trip being previewed or driven, needed to update its time estimates.
+    private var activeTrip: CPTrip?
+    private var etaObserver: AnyCancellable?
+
     // The map shown before a drive starts.
     func styleBrowsingMap() {
+        manager.carPlayMapViewController?.wayNameView?.label.superview?.addGTIGlass(.capsule)
         guard let navigationMapView = manager.carPlayMapViewController?.navigationMapView else { return }
         applyGTIMapLook(to: navigationMapView)
         if let dataSource = navigationMapView.navigationCamera.viewportDataSource as? CarPlayViewportDataSource {
@@ -38,6 +44,35 @@ final class GTICarPlay: NSObject {
     func startTestDrive(completion: @escaping () -> Void) {
         let destination = Waypoint(coordinate: testDestination, name: "Výstaviště Brno")
         manager.previewRoutes(to: destination, completionHandler: completion)
+    }
+
+    // The SDK colours the remaining time by traffic (usually green). After each of its updates,
+    // send the same estimates again in GTI red.
+    func startRedETA() {
+        etaObserver = gtiNavigationProvider.navigation().routeProgress
+            .compactMap { $0?.routeProgress }
+            .receive(on: DispatchQueue.main) // runs after the SDK's own update
+            .sink { [weak self] progress in
+                MainActor.assumeIsolated { self?.showRedETA(progress) }
+            }
+    }
+
+    func stopRedETA() {
+        etaObserver = nil
+        activeTrip = nil
+    }
+
+    private func showRedETA(_ progress: RouteProgress) {
+        guard let activeTrip,
+              let template = manager.interfaceController?.rootTemplate as? CPMapTemplate else { return }
+        let metres = progress.distanceRemaining
+        let distance = metres >= 1000
+            ? Measurement(value: (metres / 100).rounded() / 10, unit: UnitLength.kilometers)
+            : Measurement(value: (metres / 50).rounded() * 50, unit: UnitLength.meters)
+        // Like the SDK: "1 min" instead of "0 min" in the last minute.
+        let seconds = progress.durationRemaining > 0 ? max(progress.durationRemaining, 60) : 0
+        let estimates = CPTravelEstimates(distanceRemaining: distance, timeRemaining: seconds)
+        template.update(estimates, for: activeTrip, with: .red)
     }
 }
 
@@ -56,8 +91,19 @@ extension GTICarPlay: CarPlayManagerDelegate {
         return [testDriveButton]
     }
 
+    // Remember the trip so its estimates can be shown in red once driving starts.
+    func carPlayManager(_ carPlayManager: CarPlayManager, willPreview trip: CPTrip) -> CPTrip {
+        activeTrip = trip
+        return trip
+    }
+
+    func carPlayManagerWillEndNavigation(_ carPlayManager: CarPlayManager, byCanceling canceled: Bool) {
+        stopRedETA()
+    }
+
     // The browsing map (before a drive) is ready: apply the GTI look.
     func carPlayManager(_ carPlayManager: CarPlayManager, didSetup navigationMapView: NavigationMapView) {
+        carPlayManager.carPlayMapViewController?.wayNameView?.label.superview?.addGTIGlass(.capsule)
         applyGTIMapLook(to: navigationMapView)
         if let dataSource = navigationMapView.navigationCamera.viewportDataSource as? CarPlayViewportDataSource {
             applyGTICameraOptions(to: &dataSource.options)
@@ -80,6 +126,8 @@ extension GTICarPlay: CarPlayManagerDelegate {
         _ carPlayManager: CarPlayManager,
         didPresent navigationViewController: CarPlayNavigationViewController
     ) {
+        navigationViewController.wayNameView?.label.superview?.addGTIGlass(.capsule)
+        startRedETA()
         guard let navigationMapView = navigationViewController.navigationMapView else { return }
         applyGTIMapLook(to: navigationMapView)
         if let dataSource = navigationMapView.navigationCamera.viewportDataSource as? CarPlayViewportDataSource {

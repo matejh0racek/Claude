@@ -113,12 +113,24 @@ private func applyGTIAppearance() {
             timeLabel.trafficHeavyColor = .white
             timeLabel.trafficSevereColor = .white
 
+            // The current street name at the bottom of the map: glass instead of the blue pill.
+            clearWayNameBackground(for: traits)
+
             SeparatorView.appearance(for: traits).backgroundColor = UIColor.white.withAlphaComponent(0.12)
             // The bottom card is inset from the screen edges, so its full-width divider would stick out.
             SeparatorView.appearance(for: traits, whenContainedInInstancesOf: [BottomBannerView.self])
                 .backgroundColor = .clear
         }
+        clearWayNameBackground(for: UITraitCollection(userInterfaceIdiom: .carPlay))
     }
+}
+
+@MainActor
+private func clearWayNameBackground(for traits: UITraitCollection) {
+    let wayName = WayNameView.appearance(for: traits)
+    wayName.backgroundColor = .clear
+    wayName.borderColor = .clear
+    wayName.borderWidth = 0
 }
 
 // MARK: - Liquid Glass
@@ -283,6 +295,9 @@ final class GTINavigationViewController: NavigationViewController {
         for button in navigationView.allSubviews(ofType: ResumeButton.self) {
             button.addGTIGlass(.capsule)
         }
+
+        // Street name pill (its inner container is what shows and hides with the road name).
+        navigationView.wayNameView.label.superview?.addGTIGlass(.capsule)
     }
 }
 
@@ -352,7 +367,7 @@ final class GTIBottomBanner: UIViewController, NavigationComponent {
         value.font = emphasised
             ? .monospacedDigitSystemFont(ofSize: size, weight: .bold)
             : .monospacedDigitSystemFont(ofSize: size, weight: .semibold)
-        value.textColor = .white
+        value.textColor = emphasised ? gtiRed : .white
         value.textAlignment = .center
         value.adjustsFontSizeToFitWidth = true
         value.minimumScaleFactor = 0.6
@@ -360,7 +375,7 @@ final class GTIBottomBanner: UIViewController, NavigationComponent {
         let captionLabel = UILabel()
         captionLabel.text = caption
         captionLabel.font = .systemFont(ofSize: 11, weight: emphasised ? .bold : .medium)
-        captionLabel.textColor = emphasised ? gtiRed : UIColor.white.withAlphaComponent(0.55)
+        captionLabel.textColor = UIColor.white.withAlphaComponent(0.55)
         captionLabel.textAlignment = .center
 
         let stack = UIStackView(arrangedSubviews: [value, captionLabel])
