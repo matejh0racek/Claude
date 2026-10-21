@@ -28,7 +28,7 @@ let gtiAlternateGrey = UIColor(red: 90/255, green: 90/255, blue: 98/255, alpha: 
 
 // Car model on the map. Make carScale bigger or smaller if the car looks wrong,
 // and change carRotation (in degrees: 90, 180, 270) if it drives sideways or backwards.
-let carScale: Double = 2.4
+let carScale: Double = 3.4
 let carRotation: Double = 0
 
 // MARK: - Navigation engine (shared by the iPhone screen and CarPlay)
