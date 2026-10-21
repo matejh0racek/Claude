@@ -1,5 +1,6 @@
 import UIKit
 import CoreLocation
+import MapKit
 import MapboxMaps
 import MapboxDirections
 import MapboxNavigationCore
@@ -35,13 +36,19 @@ let carRotation: Double = 0
 
 // MARK: - Navigation engine (shared by the iPhone screen and CarPlay)
 
+// On a real iPhone the app follows your real GPS. The simulator has no GPS, so there it
+// drives the route for you, starting at the test origin.
+#if targetEnvironment(simulator)
+let usesRealGPS = false
+#else
+let usesRealGPS = true
+#endif
+
 // There can only be one navigation engine per app, so the phone and CarPlay both use this one.
-// .simulation drives the route for you, so you can test at your desk.
-// Change to `.live` when you want to use real GPS in the car.
 @MainActor
 let gtiNavigationProvider: MapboxNavigationProvider = {
     let provider = MapboxNavigationProvider(
-        coreConfig: .init(locationSource: .simulation(initialLocation: CLLocation(
+        coreConfig: .init(locationSource: usesRealGPS ? .live : .simulation(initialLocation: CLLocation(
             latitude: testOrigin.latitude, longitude: testOrigin.longitude)))
     )
     // No spoken directions.
@@ -485,42 +492,149 @@ private func add3DBuildings(to map: MapboxMap) {
     try? map.addLayer(layer, layerPosition: position)
 }
 
-// MARK: - View controller
+// MARK: - Start screen
 
+// "Where to?" search (Apple Maps places, no extra account needed) and a test-drive button.
 final class ViewController: UIViewController {
 
     private var navigationProvider: MapboxNavigationProvider { gtiNavigationProvider }
     private var mapboxNavigation: MapboxNavigation { navigationProvider.mapboxNavigation }
 
+    private let locationManager = CLLocationManager()
+    private let completer = MKLocalSearchCompleter()
+    private var results: [MKLocalSearchCompletion] = []
+
+    private let searchField = UISearchTextField()
+    private let resultsTable = UITableView(frame: .zero, style: .plain)
+    private let testDriveButton = UIButton(type: .system)
+
+    // Where routes start: your GPS position on a real iPhone, the test origin in the simulator.
+    private var currentOrigin: CLLocationCoordinate2D? {
+        usesRealGPS ? locationManager.location?.coordinate : testOrigin
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
+        overrideUserInterfaceStyle = .dark
 
-        let button = UIButton(type: .system)
-        button.setTitle("Start test drive", for: .normal)
-        button.setTitleColor(gtiRed, for: .normal)
-        button.titleLabel?.font = .boldSystemFont(ofSize: 22)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.addTarget(self, action: #selector(startNavigation), for: .touchUpInside)
-        view.addSubview(button)
+        if usesRealGPS {
+            locationManager.requestWhenInUseAuthorization()
+            locationManager.startUpdatingLocation()
+        }
+
+        completer.delegate = self
+        completer.resultTypes = [.address, .pointOfInterest]
+
+        let title = UILabel()
+        title.text = "GTI Nav"
+        title.font = .systemFont(ofSize: 34, weight: .heavy)
+        title.textColor = gtiRed
+
+        searchField.placeholder = "Where to?"
+        searchField.font = .systemFont(ofSize: 20, weight: .medium)
+        searchField.textColor = .white
+        searchField.tintColor = gtiRed
+        searchField.backgroundColor = .clear
+        searchField.returnKeyType = .search
+        searchField.autocorrectionType = .no
+        searchField.addTarget(self, action: #selector(searchChanged), for: .editingChanged)
+        let searchCard = UIView()
+        searchCard.addSubview(searchField)
+        searchCard.addGTIGlass(.capsule)
+        searchField.translatesAutoresizingMaskIntoConstraints = false
+
+        resultsTable.backgroundColor = .clear
+        resultsTable.separatorColor = UIColor.white.withAlphaComponent(0.12)
+        resultsTable.keyboardDismissMode = .onDrag
+        resultsTable.dataSource = self
+        resultsTable.delegate = self
+        resultsTable.register(UITableViewCell.self, forCellReuseIdentifier: "result")
+
+        testDriveButton.setTitle(
+            usesRealGPS ? "Test drive to Výstaviště Brno" : "Start test drive", for: .normal
+        )
+        testDriveButton.setTitleColor(gtiRed, for: .normal)
+        testDriveButton.titleLabel?.font = .boldSystemFont(ofSize: 20)
+        testDriveButton.addTarget(self, action: #selector(testDriveTapped), for: .touchUpInside)
+
+        for subview in [title, searchCard, resultsTable, testDriveButton] {
+            subview.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(subview)
+        }
+        let guide = view.safeAreaLayoutGuide
         NSLayoutConstraint.activate([
-            button.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            button.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+            title.topAnchor.constraint(equalTo: guide.topAnchor, constant: 16),
+            title.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: 24),
+
+            searchCard.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 16),
+            searchCard.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: 16),
+            searchCard.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -16),
+            searchCard.heightAnchor.constraint(equalToConstant: 56),
+            searchField.leadingAnchor.constraint(equalTo: searchCard.leadingAnchor, constant: 16),
+            searchField.trailingAnchor.constraint(equalTo: searchCard.trailingAnchor, constant: -16),
+            searchField.centerYAnchor.constraint(equalTo: searchCard.centerYAnchor),
+
+            resultsTable.topAnchor.constraint(equalTo: searchCard.bottomAnchor, constant: 8),
+            resultsTable.leadingAnchor.constraint(equalTo: guide.leadingAnchor),
+            resultsTable.trailingAnchor.constraint(equalTo: guide.trailingAnchor),
+            resultsTable.bottomAnchor.constraint(equalTo: testDriveButton.topAnchor, constant: -8),
+
+            testDriveButton.centerXAnchor.constraint(equalTo: guide.centerXAnchor),
+            testDriveButton.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -16),
+            testDriveButton.heightAnchor.constraint(equalToConstant: 48)
         ])
     }
 
-    @objc private func startNavigation() {
-        Task { await requestRouteAndNavigate() }
+    @objc private func searchChanged() {
+        // Prefer places near you.
+        if let origin = currentOrigin {
+            completer.region = MKCoordinateRegion(
+                center: origin, latitudinalMeters: 100_000, longitudinalMeters: 100_000
+            )
+        }
+        let text = searchField.text ?? ""
+        if text.isEmpty {
+            results = []
+            resultsTable.reloadData()
+        } else {
+            completer.queryFragment = text
+        }
+    }
+
+    @objc private func testDriveTapped() {
+        Task { await navigate(to: testDestination, name: "Výstaviště Brno") }
+    }
+
+    private func select(_ completion: MKLocalSearchCompletion) async {
+        searchField.resignFirstResponder()
+        do {
+            let response = try await MKLocalSearch(request: MKLocalSearch.Request(completion: completion)).start()
+            guard let item = response.mapItems.first else { return }
+            await navigate(to: item.placemark.coordinate, name: completion.title)
+        } catch {
+            showMessage("Couldn't find that place", error.localizedDescription)
+        }
     }
 
     @MainActor
-    private func requestRouteAndNavigate() async {
-        let options = NavigationRouteOptions(coordinates: [testOrigin, testDestination])
+    private func navigate(to destination: CLLocationCoordinate2D, name: String) async {
+        guard let origin = currentOrigin else {
+            showMessage(
+                "Waiting for GPS",
+                "Allow location access for GTI Nav in Settings, then try again in a few seconds."
+            )
+            return
+        }
+        let options = NavigationRouteOptions(waypoints: [
+            Waypoint(coordinate: origin),
+            Waypoint(coordinate: destination, name: name)
+        ])
         let request = mapboxNavigation.routingProvider().calculateRoutes(options: options)
 
         switch await request.result {
         case .failure(let error):
-            print("Route request failed: \(error.localizedDescription)")
+            showMessage("No route found", error.localizedDescription)
         case .success(let navigationRoutes):
             let bottomBanner = GTIBottomBanner()
             let navigationOptions = NavigationOptions(
@@ -545,9 +659,52 @@ final class ViewController: UIViewController {
 
             // If CarPlay is connected, show the same drive on the car screen.
             if CarPlayManager.isConnected {
-                GTICarPlay.shared.manager.beginNavigationWithCarPlay(using: testOrigin)
+                GTICarPlay.shared.manager.beginNavigationWithCarPlay(using: origin)
             }
         }
+    }
+
+    private func showMessage(_ title: String, _ message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+}
+
+extension ViewController: MKLocalSearchCompleterDelegate {
+    nonisolated func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        MainActor.assumeIsolated {
+            results = completer.results
+            resultsTable.reloadData()
+        }
+    }
+
+    nonisolated func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {}
+}
+
+extension ViewController: UITableViewDataSource, UITableViewDelegate {
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        results.count
+    }
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "result", for: indexPath)
+        let result = results[indexPath.row]
+        var content = UIListContentConfiguration.subtitleCell()
+        content.text = result.title
+        content.secondaryText = result.subtitle
+        content.textProperties.color = .white
+        content.textProperties.font = .systemFont(ofSize: 18, weight: .semibold)
+        content.secondaryTextProperties.color = UIColor.white.withAlphaComponent(0.55)
+        cell.contentConfiguration = content
+        cell.backgroundColor = .clear
+        return cell
+    }
+
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        let result = results[indexPath.row]
+        Task { await select(result) }
     }
 }
 
